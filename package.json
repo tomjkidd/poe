@@ -1,0 +1,22 @@
+{
+  "name": "poe",
+  "version": "1.0.0",
+  "description": "A lumo based test runner for selenium-webdriver using node-js bindings and clojurescript",
+  "main": "src/poe/core.cljs",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "selenium",
+    "selenium-webdriver",
+    "lumo",
+    "cljs",
+    "clojurescript"
+  ],
+  "author": "tomjkidd@gmail.com",
+  "license": "MIT",
+  "dependencies": {
+    "npm": "^6.0.1",
+    "selenium-webdriver": "^4.0.0-alpha.1"
+  }
+}
