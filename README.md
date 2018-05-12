@@ -34,7 +34,7 @@ Also, I'm assuming OSX with brew, if you aren't using this, you can get the
 dependencies some other way.
 
 ```bash
-brew install chromedriver
+brew cask install chromedriver
 brew install lumo
 npm install
 ```
