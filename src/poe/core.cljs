@@ -1,20 +1,13 @@
 (ns poe.core
   "Provides a test runnter to make it easier to work with
   selenium-webdriver, with a focus on data and direct interop."
-  (:require [goog.object :as go]))
-
-;; node dependencies
-
-(def wd (js/require "selenium-webdriver"))
-(def Builder (go/get wd "Builder"))
-(def By (go/get wd "By"))
-(def Key (go/get wd "Key"))
-(def until (go/get wd "until"))
+  (:require [goog.object :as go]
+            [poe.webdriver.webdriver :as webdriver]))
 
 (def driver
   "The selenium-webdriver driver to be used for a session"
   ;; TODO: Research what options are for this part of things...
-  (-> (Builder.)
+  (-> (webdriver/Builder.)
       (.forBrowser "chrome")
       (.build)))
 
@@ -30,7 +23,7 @@
   (by* :css \".class-selector\")
   (by* :xpath \"//input[@name='password']\")"
   [by-fn-keword selector]
-  ((go/get By (name by-fn-keword)) selector))
+  ((go/get webdriver/By (name by-fn-keword)) selector))
 
 (defmulti interpret
   "Interpret an action as a selenium-webdriver operation.
@@ -68,7 +61,7 @@
   [[action selector {:keys [timeout by]
                      :or   {by :css}}]]
   #(.wait driver
-          (.elementIsVisible until (.findElement driver (by* by selector)))
+          (.elementIsVisible webdriver/until (.findElement driver (by* by selector)))
           (or timeout default-timeout)))
 
 (defmethod
@@ -78,7 +71,7 @@
                      :or   {timeout default-timeout
                             by      :css}}]]
   #(.wait driver
-          (.elementLocated until (by* by selector))
+          (.elementLocated webdriver/until (by* by selector))
           (or timeout default-timeout)))
 
 (defmethod
@@ -86,7 +79,7 @@
   interpret :wait-for-stale
   [[action selector {:keys [timeout by]}]]
   #(.wait driver
-          (.stalenessOf until (.findElement driver (by* by selector)))
+          (.stalenessOf webdriver/until (.findElement driver (by* by selector)))
           (or timeout default-timeout)))
 
 (defmethod
@@ -104,7 +97,7 @@
                           :or {enter? false
                                by     :css}}]]
   #(-> (.findElement driver (by* by selector))
-       (.sendKeys text (if enter? (.-ENTER Key) ""))))
+       (.sendKeys text (if enter? webdriver/Key.ENTER ""))))
 
 (defn run
   "Run the vector of step-fns as a series of chained `then` calls,
@@ -158,9 +151,9 @@
 ;; Example of raw interop with selenium-webdriver, for comparison
 (comment
   (-> (.get driver "http://www.google.com/ncr")
-      (.then #(-> (.findElement driver (.name By "q"))
-                  (.sendKeys "webdriver" Key.ENTER)))
-      (.then #(.wait driver (.titleIs until "webdriver - Google Search") 1000))
+      (.then #(-> (.findElement driver (.name webdriver/By "q"))
+                  (.sendKeys "webdriver" webdriver/Key.ENTER)))
+      (.then #(.wait driver (.titleIs webdriver/until "webdriver - Google Search") 1000))
       (.then #(.quit driver))
       (.catch #(do
                  (js/console.log "Exception occurred:")

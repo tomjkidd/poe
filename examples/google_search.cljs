@@ -1,6 +1,7 @@
 (ns examples.google-search
   "An example of how to use the poe/run to perform a google search"
-  (:require [poe.core :as poe]))
+  (:require [poe.core :as poe]
+            [poe.webdriver.webdriver :refer [until]]))
 
 (defn -main
   [& _]
@@ -10,5 +11,5 @@
     (poe/run
       {:url url}
       [[:input-text search-input-selector search-input {:by :name :enter? true}]
-       #(.wait poe/driver (.titleIs poe/until "altered carbon poe - Google Search") 1000)
+       #(.wait poe/driver (.titleIs until "altered carbon poe - Google Search") 1000)
        [:click "Images" {:by :linkText}]])))
