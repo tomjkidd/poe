@@ -83,7 +83,7 @@
           (or timeout default-timeout)))
 
 (defmethod
-  ^{:doc ":click - Click the element identified by `selector`."}
+  ^{:doc "Click the element identified by `selector`."}
   interpret :click
   [[action selector {:keys [by]
                      :or   {by :css}}]]
@@ -91,7 +91,7 @@
        (.click)))
 
 (defmethod
-  ^{:doc ":input-text - Input `text` into the element identified by `selector`."}
+  ^{:doc "Input `text` into the element identified by `selector`."}
   interpret :input-text
   [[action selector text {:keys [enter? by]
                           :or {enter? false
