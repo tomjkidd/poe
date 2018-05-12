@@ -11,5 +11,5 @@
     (poe/run
       {:url url}
       [[:input-text search-input-selector search-input {:by :name :enter? true}]
-       #(.wait poe/driver (.titleIs until "altered carbon poe - Google Search") 1000)
+       #(.wait poe/driver (.titleIs until (str search-input " - Google Search")) 1000)
        [:click "Images" {:by :linkText}]])))
