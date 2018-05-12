@@ -55,6 +55,16 @@ lumo --classpath src:examples -m examples.hotmail-login
 
 ## How to use this library
 
-TODO: Discuss ability to use arbitrary functions for operations
-TODO: Discuss how to turn arbitrary function into defmethods for interpret
-TODO: Discuss why data format for tests is useful
+- TODO: Discuss ability to use arbitrary functions for operations
+- TODO: Discuss how to turn arbitrary function into defmethods for interpret
+- TODO: Discuss why data format for tests is useful
+
+## Resources
+
+The following should be sufficient to fill in the gaps that I've left:
+
+- [anmonteiro's lumo](https://github.com/anmonteiro/lumo)
+
+- [selenium-webdriver, node bindings](http://seleniumhq.github.io/selenium/docs/api/javascript/index.html)
+- [Rafal Spacjer's blogpost on clojurescript interop](http://www.spacjer.com/blog/2014/09/12/clojurescript-javascript-interop/)
+- [clojurescript cheatsheet, search for interop](http://www.spacjer.com/blog/2014/09/12/clojurescript-javascript-interop/)
