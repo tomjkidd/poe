@@ -13,7 +13,7 @@
 
 (def default-timeout
   "The default timeout for selenium-webdriver operations"
-  3000)
+  5000)
 
 (defn by*
   "Call the identified function named by by-fn-keyword, passing
@@ -131,13 +131,16 @@
   but if you find yourself using certain ones over and over again,
   you can extend `interpret` to give yourself a more convenient way
   to express the operation."
-  [{:keys [url quit?] :or {quit? true}} step-fns]
+  [{:keys [url promise quit?] :or {quit? true}} step-fns]
   (.catch
    (reduce (fn [acc cur]
              (.then acc (if (vector? cur)
                           (interpret cur)
                           cur)))
-           (.get driver url)
+           (cond
+             url (.get driver url)
+             promise promise
+             :else (throw (ex-info "Need to provide either :url or :promise to run" {})))
            (cond-> step-fns
              quit? (into [[:quit]])))
    ;; TODO: May want to allow more options for how to handle errors

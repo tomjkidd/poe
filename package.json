@@ -16,7 +16,8 @@
   "author": "tomjkidd@gmail.com",
   "license": "MIT",
   "dependencies": {
-    "npm": "^6.0.1",
+    "csv-stringify": "5.3.3",
+    "npm": "^6.12.0",
     "selenium-webdriver": "^4.0.0-alpha.1"
   }
 }
