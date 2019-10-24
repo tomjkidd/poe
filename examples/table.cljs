@@ -94,8 +94,6 @@
                                 (js/Promise.all promise-row-array)))))))]
     (.then (js/Promise.all (clj->js [header-promise body-promise]))
            (fn [[header-row body-rows]]
-             (print {:header-row header-row
-                     :body-rows body-rows})
              (let [header-row-clj (js->clj header-row)]
                (into (cond-> []
                        (seq header-row-clj) (conj header-row-clj))
