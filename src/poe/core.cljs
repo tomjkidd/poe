@@ -1,8 +1,7 @@
 (ns poe.core
   "Provides a test runnter to make it easier to work with
   selenium-webdriver, with a focus on data and direct interop."
-  (:require [goog.object :as go]
-            [poe.webdriver.webdriver :as webdriver]))
+  (:require [poe.webdriver.webdriver :as webdriver]))
 
 (def driver
   "The selenium-webdriver driver to be used for a session"
@@ -15,15 +14,7 @@
   "The default timeout for selenium-webdriver operations"
   5000)
 
-(defn by*
-  "Call the identified function named by by-fn-keyword, passing
-  selector to that function
-
-  This allows a more clojure-friendly usage of `By` functionality:
-  (by* :css \".class-selector\")
-  (by* :xpath \"//input[@name='password']\")"
-  [by-fn-keword selector]
-  ((go/get webdriver/By (name by-fn-keword)) selector))
+(def by* webdriver/by*)
 
 (defmulti interpret
   "Interpret an action as a selenium-webdriver operation.
