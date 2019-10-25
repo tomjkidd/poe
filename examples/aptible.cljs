@@ -31,6 +31,9 @@
 (def app-name->id-path (or process.env.APTIBLE_APP_NAME_TO_ID_EDN_FILE
                            (str cwd "/examples/aptible/app-name-to-id.edn")))
 
+(def security-scan-tuples-path (or process.env.APTIBLE_SECURITY_SCAN_TUPLE_EDN_FILE
+                                   (str cwd "/examples/aptible/security-scan-tuples.edn")))
+
 ;; The actual maps used to go from names to ids
 (def stack-name->id
   "A hash-map where each key is the name of a stack, and each value is an integer
@@ -52,7 +55,7 @@
 
   These tuples are used by `examples.aptible/produce-security-scan-actions` to navigatate
   to the \"Security Scan\" tab to run the scan and capture results"
-  (slurp-edn (str cwd "/examples/aptible/security-scan-tuples.edn")))
+  (slurp-edn security-scan-tuples-path))
 
 (defn produce-login-actions
   ([]
@@ -128,17 +131,42 @@
      [:wait-until-located enclave-selector]
      [:click enclave-selector]]))
 
+(defn validate-edn-configuration
+  "Makes sure that for every stack/env/app in security-scan-tuples, there are mappings"
+  []
+  (reduce (fn [acc [stack env app]]
+            (cond-> acc
+              (nil? (stack-name->id stack))
+              (update :errors conj {:type :stack-name-mapping
+                                    :msg  (str "Stack " stack " doesn't have an entry in the stack-name->id map.")})
+
+              (nil? (environment-name->id env))
+              (update :errors conj {:type :environment-name-mapping
+                                    :msg  (str "Environment " env " doesn't have an entry in the environment-name->id map.")})
+
+              (nil? (app-name->id app))
+              (update :errors conj {:type :app-name-mapping
+                                    :msg  (str "App " app " doesn't have an entry in the app-name->id map.")})))
+          {:errors []}
+          security-scan-tuples))
+
 (defn -main
   "Use config files to identify aptible apps, run the \"Security Scan\" on them,
   and capture the results. All done through selenium webdriver via the aptible web ui."
   [& _]
-  (let [url "https://dashboard.aptible.com/login"]
-    (poe/run
-      {:url   url
-       :quit? true}
-      (reduce (fn [acc cur] (into acc (apply produce-security-scan-actions cur)))
-              (produce-login-actions)
-              security-scan-tuples))))
+  (let [url "https://dashboard.aptible.com/login"
+        {:keys [errors]} (validate-edn-configuration)]
+    (if (seq errors)
+      (do
+        (println "Errors detected:")
+        (doseq [error errors]
+          (println (:msg error))))
+      (poe/run
+        {:url   url
+         :quit? true}
+        (reduce (fn [acc cur] (into acc (apply produce-security-scan-actions cur)))
+                (produce-login-actions)
+                security-scan-tuples)))))
 
 (comment
   (require 'poe.core
