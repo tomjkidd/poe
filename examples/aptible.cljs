@@ -138,7 +138,7 @@
   (let [url "https://dashboard.aptible.com/login"]
     (poe/run
       {:url   url
-       :quit? false}
+       :quit? true}
       (reduce (fn [acc cur] (into acc (apply produce-security-scan-actions cur)))
               (produce-login-actions)
               security-scan-tuples))))
