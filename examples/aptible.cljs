@@ -8,9 +8,6 @@
             [poe.html.scrape :as html-scrape]
             [poe.util :as util]))
 
-(def fs (js/require "fs"))
-(def csv-stringify (js/require "csv-stringify/lib/sync"))
-
 (def slurp util/slurp)
 
 (def slurp-edn util/slurp-edn)
