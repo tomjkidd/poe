@@ -4,27 +4,18 @@
   APTIBLE_EMAIL=fake@email.com APTIBLE_PASSWORD=p@ssW0rD APTIBLE_MULTI_FACTOR_TOKEN=123456 lumo --classpath src:examples -m examples.aptible
 "
   (:require [poe.core :as poe]
-            [cljs.reader :as cljs-reader]))
+            [poe.file-export :as file-export]
+            [poe.html.scrape :as html-scrape]
+            [poe.util :as util]))
 
 (def fs (js/require "fs"))
 (def csv-stringify (js/require "csv-stringify/lib/sync"))
 
-(defn slurp
-  "Read a file, as a string"
-  [path]
-  (str (.readFileSync fs path)))
+(def slurp util/slurp)
 
-(defn slurp-edn
-  "Read a file, as edn"
-  [path]
-  (-> path
-      slurp
-      cljs-reader/read-string))
+(def slurp-edn util/slurp-edn)
 
-(defn spit
-  "Write a string to file"
-  [f data]
-  (.writeFileSync fs f data))
+(def spit util/spit)
 
 (def env-email process.env.APTIBLE_EMAIL)
 (def env-password process.env.APTIBLE_PASSWORD)
@@ -101,8 +92,8 @@
         environment-selector      (str "a[href='/accounts/" (environment-name->id environment "']"))
         app-selector              (str "a[href='/apps/" (app-name->id app) "']")
         security-scan-selector    (str "a[href='/apps/" (app-name->id app) "/security-scan']")
-        table-selector            "//table/tbody"
-        table-or-success-selector "//table/tbody|//*[contains(@class,'alert-success')]"
+        table-selector            "//table"
+        table-or-success-selector "//table|//*[contains(@class,'alert-success')]"
         enclave-selector          ".enclave-nav"]
     [[:wait-until-located stack-selector]
      [:wait-until-visible stack-selector]
@@ -120,46 +111,23 @@
      [:wait-until-visible security-scan-selector]
      [:click security-scan-selector]
 
-     ;; Scrape the report from the page...
-     ;; Inspired, at least in spirit, by
-     ;; https://www.techbeamers.com/handling-html-tables-selenium-webdriver/
      [:wait-until-located table-or-success-selector {:by :xpath}]
      [:wait-until-visible table-or-success-selector {:by :xpath}]
-     #(.executeScript poe/driver "document.getElementsByClassName('alert-success').length > 0;")
+     #(.executeScript poe/driver "return document.getElementsByClassName('alert-success').length > 0;")
      (fn [no-vulnerabilities?]
        (if no-vulnerabilities?
          (js/Promise.resolve (clj->js []))
-         (.then (.findElement poe/driver
-                              (poe/by* :xpath table-selector))
-                (fn [tbody]
-                  (.then (.findElements tbody
-                                        (poe/by* :css "tr"))
-                         (fn [rows]
-                           (let [promise-row-list
-                                 (map-indexed
-                                  (fn [idx row]
-                                    (.then
-                                     (.findElements (get (js->clj rows) idx)
-                                                    (poe/by* :css "td"))
-                                     (fn [cols]
-                                       (let [promise-col-list
-                                             (map-indexed
-                                              (fn [col-idx col]
-                                                (.getText (get (js->clj cols) col-idx)))
-                                              cols)
-
-                                             promise-col-array (clj->js promise-col-list)]
-                                         (js/Promise.all promise-col-array)))))
-                                  rows)
-
-                                 promise-row-array (clj->js promise-row-list)]
-                             (js/Promise.all promise-row-array))))))))
+         (html-scrape/scrape-table poe/driver {:selector        table-selector
+                                               :by              :xpath
+                                               :include-header? true})))
      (fn [rows]
-       (let [filename  (str "aptible-security-scan-" stack "-" environment "-" app ".csv")
+       (let [filename  (str "aptible-security-scan-"
+                            stack "-" environment "-" app "-"
+                            (.toISOString (js/Date.)) ".csv")
              directory (or env-output-dir cwd)
              file      (str directory "/" filename)]
          (js/console.log (str "Exporting table data to: " file))
-         (spit file (csv-stringify rows))))
+         (file-export/csv file rows)))
      [:wait-until-located enclave-selector]
      [:click enclave-selector]]))
 

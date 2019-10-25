@@ -12,7 +12,11 @@
       <th>...
     <tbody>
      <tr>
-      <td>..."
+      <td>...
+
+  Inspired, at least in spirit, by:
+  https://www.techbeamers.com/handling-html-tables-selenium-webdriver/
+  "
   [driver {:keys [selector by include-header?]
            :or   {selector        "table"
                   by              :css
