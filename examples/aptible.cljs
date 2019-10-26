@@ -10,16 +10,14 @@
             [poe.html.scrape :as html-scrape]
             [poe.util :as util]))
 
+(def cwd (js/process.cwd))
+
 (def slurp-edn util/slurp-edn)
 
 (def env-email process.env.APTIBLE_EMAIL)
 (def env-password process.env.APTIBLE_PASSWORD)
 (def env-multi-factor-token process.env.APTIBLE_MULTI_FACTOR_TOKEN)
 (def env-output-dir process.env.APTIBLE_OUTPUT_DIR)
-
-
-(def cwd (js/process.cwd))
-
 (def security-scan-tuples-path (or process.env.APTIBLE_SECURITY_SCAN_TUPLE_EDN_FILE
                                    (str cwd "/examples/aptible/security-scan-tuples.edn")))
 (def security-scan-tuples
