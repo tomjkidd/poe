@@ -10,46 +10,18 @@
             [poe.html.scrape :as html-scrape]
             [poe.util :as util]))
 
-(def slurp util/slurp)
-
 (def slurp-edn util/slurp-edn)
-
-(def spit util/spit)
 
 (def env-email process.env.APTIBLE_EMAIL)
 (def env-password process.env.APTIBLE_PASSWORD)
 (def env-multi-factor-token process.env.APTIBLE_MULTI_FACTOR_TOKEN)
 (def env-output-dir process.env.APTIBLE_OUTPUT_DIR)
 
-;; The aptible UI renders elements with hrefs to ids, not the convenient names
-;; of stacks/environments/apps. For this reason, it is most simple to create a
-;; mapping of names to ids so that the selectors used in navigation are more
-;; reliable
+
 (def cwd (js/process.cwd))
-(def stack-name->id-path (or process.env.APTIBLE_STACK_NAME_TO_ID_EDN_FILE
-                             (str cwd "/examples/aptible/stack-name-to-id.edn")))
-(def environment-name->id-path (or process.env.APTIBLE_ENVIRONMENT_NAME_TO_ID_EDN_FILE
-                                   (str cwd "/examples/aptible/environment-name-to-id.edn")))
-(def app-name->id-path (or process.env.APTIBLE_APP_NAME_TO_ID_EDN_FILE
-                           (str cwd "/examples/aptible/app-name-to-id.edn")))
 
 (def security-scan-tuples-path (or process.env.APTIBLE_SECURITY_SCAN_TUPLE_EDN_FILE
                                    (str cwd "/examples/aptible/security-scan-tuples.edn")))
-
-;; The actual maps used to go from names to ids
-(def stack-name->id
-  "A hash-map where each key is the name of a stack, and each value is an integer
-  used by aptible to represent it"
-  (slurp-edn stack-name->id-path))
-(def environment-name->id
-  "A hash-map where each key is the name of an environment, and each value is an integer
-  used by aptible to represent it"
-  (slurp-edn environment-name->id-path))
-(def app-name->id
-  "A hash-map where each key is the name of an app, and each value is an integer
-  used by aptible to represent it"
-  (slurp-edn app-name->id-path))
-
 (def security-scan-tuples
   "A vector of vectors, each of which specifies a [stack-name environment-name app-name].
 
@@ -135,11 +107,16 @@
      [:click landing-page-selector]]))
 
 (defn determine-aptible-identifiers
-  "Returns a promise that will eventually know all stack/env/app ids, and provide lookups to get from names to the ids.
+  "Returns a promise that will eventually know all stack/env/app ids, and provide
+  lookups to get from names to the ids.
 
-  Demonstrates how to scrape the aptible landing page to extract all of the ids to be able to use stack/env/app names instead of ids.
+  Demonstrates how to scrape the aptible landing page to extract all of the ids
+  to be able to use stack/env/app names instead of ids.
 
-  NOTE: This will probably come to replace the edn files that are helping provide this functionality currently."
+  The aptible UI renders elements with hrefs to ids, not the convenient names
+  of stacks/environments/apps. For this reason, it is most simple to create a
+  mapping of names to ids so that the selectors used in navigation are more
+  reliable."
   []
   (let [stack-selector "//*[@class='nav stack-list']//a"
         by             :xpath]
@@ -243,7 +220,7 @@
           security-scan-tuples))
 
 (defn -main
-  "Use config files to identify aptible apps, run the \"Security Scan\" on them,
+  "Use web ui to identify aptible apps, run the \"Security Scan\" on the ones identified in config file,
   and capture the results. All done through selenium webdriver via the aptible web ui."
   [& _]
   (let [url "https://dashboard.aptible.com/login"]
