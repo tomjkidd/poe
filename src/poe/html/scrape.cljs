@@ -32,46 +32,44 @@
               (.then (fn [tr]
                        (.findElements tr (webdriver/by* :css "th"))))
               (.then (fn [cols]
-                       (let [promise-col-list
-                             (map-indexed
-                              (fn [col-idx col]
-                                (.getText (get (js->clj cols) col-idx)))
-                              cols)
-
-                             promise-col-array (clj->js promise-col-list)]
-                         (js/Promise.all promise-col-array)))))
-          (js/Promise.resolve (clj->js [])))
+                       (reduce (fn [acc-promise col-promise]
+                                 (.then acc-promise
+                                        (fn [acc]
+                                          (.then (.getText col-promise)
+                                                 #(conj acc %)))))
+                               (js/Promise.resolve [])
+                               cols))))
+          (js/Promise.resolve []))
 
         body-promise
         (-> (.findElement driver (webdriver/by* by selector))
             (.then (fn [table]
                      (.findElement table (webdriver/by* :css "tbody"))))
             (.then (fn [tbody]
-                     (.then (.findElements tbody
-                                           (webdriver/by* :css "tr"))
-                            (fn [rows]
-                              (let [promise-row-list
-                                    (map-indexed
-                                     (fn [idx row]
-                                       (.then
-                                        (.findElements (get (js->clj rows) idx)
-                                                       (webdriver/by* :css "td"))
-                                        (fn [cols]
-                                          (let [promise-col-list
-                                                (map-indexed
-                                                 (fn [col-idx col]
-                                                   (.getText (get (js->clj cols) col-idx)))
-                                                 cols)
-
-                                                promise-col-array (clj->js promise-col-list)]
-                                            (js/Promise.all promise-col-array)))))
-                                     rows)
-
-                                    promise-row-array (clj->js promise-row-list)]
-                                (js/Promise.all promise-row-array)))))))]
-    (.then (js/Promise.all (clj->js [header-promise body-promise]))
-           (fn [[header-row body-rows]]
-             (let [header-row-clj (js->clj header-row)]
-               (into (cond-> []
-                       (seq header-row-clj) (conj header-row-clj))
-                     (js->clj body-rows)))))))
+                     (.findElements tbody
+                                    (webdriver/by* :css "tr"))))
+            (.then (fn [trs]
+                     (reduce
+                      (fn [row-acc-promise tr-promise]
+                        (.then row-acc-promise
+                               (fn [row-acc]
+                                 (.then (.findElements tr-promise (webdriver/by* :css "td"))
+                                        (fn [tds]
+                                          (.then (reduce (fn [col-acc-promise td-promise]
+                                                           (.then col-acc-promise
+                                                                  (fn [col-acc]
+                                                                    (.then (.getText td-promise)
+                                                                           #(conj col-acc %)))))
+                                                         (js/Promise.resolve [])
+                                                         tds)
+                                                 (fn [row]
+                                                   (conj row-acc row))))))))
+                      (js/Promise.resolve [])
+                      trs))))]
+    (.then header-promise
+           (fn [header-row]
+             (.then body-promise
+                    (fn [body-rows]
+                      (into (cond-> []
+                              (seq header-row) (conj header-row))
+                            body-rows)))))))
