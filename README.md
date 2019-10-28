@@ -51,6 +51,7 @@ NOTE: If you want the email login examples to succeed, you will need to update t
 lumo --classpath src:examples -m examples.google-search
 lumo --classpath src:examples -m examples.gmail-login
 lumo --classpath src:examples -m examples.hotmail-login
+lumo --classpath src:examples -m examples.table
 ```
 
 ## How to use this library
