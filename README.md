@@ -67,4 +67,4 @@ The following should be sufficient to fill in the gaps that I've left:
 
 - [selenium-webdriver, node bindings](http://seleniumhq.github.io/selenium/docs/api/javascript/index.html)
 - [Rafal Spacjer's blogpost on clojurescript interop](http://www.spacjer.com/blog/2014/09/12/clojurescript-javascript-interop/)
-- [clojurescript cheatsheet, search for interop](http://www.spacjer.com/blog/2014/09/12/clojurescript-javascript-interop/)
+- [clojurescript cheatsheet, search for interop](https://cljs.info/cheatsheet/)

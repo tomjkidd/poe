@@ -4,7 +4,7 @@
 (defn scrape-table
   "Attempts to scrape an html table from the current page.
   Makes no attempts to really handle errors, and assumes a simple html table structure:
-  (closing tags omitted from brevity)
+  (closing tags omitted for brevity)
 
   <table>
     <thead>
