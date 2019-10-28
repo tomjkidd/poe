@@ -2,7 +2,7 @@
   "An example of how to use poe/run to perform some security scanning of aptible apps
 
   APTIBLE_EMAIL=fake@email.com APTIBLE_PASSWORD=p@ssW0rD APTIBLE_MULTI_FACTOR_TOKEN=123456 lumo --classpath src:examples -m examples.aptible
-"
+  "
   (:require [cljs.pprint :refer [pprint]]
             [clojure.string :as str]
             [poe.core :as poe]
@@ -23,10 +23,10 @@
 (def security-scan-tuples
   "A vector of vectors, each of which specifies a [stack-name environment-name app-name].
 
-  Each named entity must be present in the <entity>-name->id maps!
+  Each named entity must be present in the result produced by determine-aptible-identifiers!
 
   These tuples are used by `examples.aptible/produce-security-scan-actions` to navigatate
-  to the \"Security Scan\" tab to run the scan and capture results"
+  to the \"Security Scan\" tab to run the scan and capture results."
   (slurp-edn security-scan-tuples-path))
 
 (def landing-page-selector
@@ -89,7 +89,7 @@
      #(.executeScript poe/driver "return document.getElementsByClassName('alert-success').length > 0;")
      (fn [no-vulnerabilities?]
        (if no-vulnerabilities?
-         (js/Promise.resolve (clj->js []))
+         (js/Promise.resolve [])
          (html-scrape/scrape-table poe/driver {:selector        table-selector
                                                :by              :xpath
                                                :include-header? true})))
@@ -120,83 +120,78 @@
         by             :xpath]
     (-> (.findElements poe/driver (poe/by* by stack-selector))
         (.then (fn [stack-web-elements]
-                 (let [name-href-tuple-promises
-                       (mapv
-                        (fn [e]
-                          (-> e
-                              (.getAttribute "href")
-                              (.then (fn [href]
-                                       (.then (.getText e)
-                                              (fn [name]
-                                                [(str/lower-case name) href]))))))
-                        stack-web-elements)]
-                   (js/Promise.all (clj->js name-href-tuple-promises)))))
+                 (reduce (fn [acc-promise e]
+                           (.then acc-promise
+                                  (fn [acc]
+                                    (-> e
+                                        (.getAttribute "href")
+                                        (.then (fn [href]
+                                                 (.then (.getText e)
+                                                        (fn [name]
+                                                          (conj acc [(str/lower-case name) href])))))))))
+                         (js/Promise.resolve [])
+                         stack-web-elements)))
         (.then (fn [name-href-tuples]
-                 (let [result
-                       (reduce (fn [acc [name href]]
-                                 (cond
-                                   ;; accounts correspond to environments
-                                   (str/includes? href "/accounts/")
-                                   (-> acc
-                                       (update :environment-name-href-tuples conj [name href])
-                                       (assoc-in [:environment-name->id name] (last (str/split href #"/"))))
+                 (reduce (fn [acc [name href]]
+                           (cond
+                             ;; accounts correspond to environments
+                             (str/includes? href "/accounts/")
+                             (-> acc
+                                 (update :environment-name-href-tuples conj [name href])
+                                 (assoc-in [:environment-name->id name] (last (str/split href #"/"))))
 
-                                   (str/includes? href "/stack/")
-                                   (assoc-in acc [:stack-name->id name] (last (str/split href #"/")))))
-                               {:stack-name->id                     {}
-                                :environment-name->id               {}
-                                :environment-name-href-tuples       []
-                                :environment-name->app-name->app-id {}}
-                               ;; There is an item with a nil href for creating a new environment
-                               (filter #(some? (second %))
-                                       name-href-tuples))]
-                   (js/Promise.resolve result))))
+                             (str/includes? href "/stack/")
+                             (assoc-in acc [:stack-name->id name] (last (str/split href #"/")))))
+                         {:stack-name->id                     {}
+                          :environment-name->id               {}
+                          :environment-name-href-tuples       []
+                          :environment-name->app-name->app-id {}}
+                         ;; There is an item with a nil href for creating a new environment
+                         (filter #(some? (second %))
+                                 name-href-tuples))))
         (.then (fn [result]
-                 (js/Promise.all (clj->js [(js/Promise.resolve result)
-                                           (.executeScript poe/driver "return window.location.hostname;")]))))
-        (.then (fn [[result hostname]]
-                 (js/Promise.resolve (assoc result :hostname hostname))))
+                 (.then (.executeScript poe/driver "return window.location.hostname;")
+                        (fn [hostname]
+                          (assoc result :hostname hostname)))))
         (.then (fn [{:keys [environment-name-href-tuples hostname] :as result}]
                  ;; Navigate to each environment to scrape the apps that are there
                  ;; Note, reduce is used to make this happen sequentially, since js/Promise.all doesn't ensure that!
-                 (-> (reduce
-                      (fn [acc-promise [env-name href]]
-                        (let [relative-href (second (str/split href hostname))]
-                          (.then acc-promise
-                                 (fn [acc]
-                                   (-> (.findElement poe/driver (poe/by* :xpath (str "//a[@href='" relative-href "']")))
-                                       (.click)
-                                       ;; Wait for page to load
-                                       (.then (fn [_]
-                                                (.wait poe.core/driver
-                                                       (fn []
-                                                         (-> (.getCurrentUrl poe/driver)
-                                                             (.then (fn [url] (str/includes? url href)))))
-                                                       5000)))
-                                       (.then (fn [_]
-                                                (.findElements poe/driver (poe/by* :xpath "//*[contains(@class, 'resource-row app')]"))))
-                                       (.then (fn [app-elements]
-                                                (let [name-id-tuple-promises
-                                                      (mapv
-                                                       (fn [e]
-                                                         (-> (.getAttribute e "href")
-                                                             (.then (fn [href]
-                                                                      (-> (.findElement e (poe/by* :css ".resource-row__title"))
-                                                                          (.then (fn [t]
-                                                                                   (.getText t)))
-                                                                          (.then (fn [name]
-                                                                                   ;; href in the form https://dashboard.aptible.com/apps/123456, we just want the id
-                                                                                   (js/Promise.resolve
-                                                                                    [name (last (str/split href #"/"))]))))))))
-                                                       app-elements)]
-                                                  (js/Promise.all (clj->js name-id-tuple-promises)))))
-                                       (.then (fn [name-id-tuples]
-                                                (js/Promise.resolve (into {} (js->clj name-id-tuples)))))
-                                       (.then (fn [app-map]
-                                                (js/Promise.resolve (assoc-in acc [:environment-name->app-name->app-id env-name] app-map)))))))))
-                             (js/Promise.resolve result)
-                             environment-name-href-tuples)
-                     (.then (fn [result] result))))))))
+                 (reduce
+                  (fn [result-acc-promise [env-name href]]
+                    (let [relative-href (second (str/split href hostname))]
+                      (.then result-acc-promise
+                             (fn [result-acc]
+                               (-> (.findElement poe/driver (poe/by* :xpath (str "//a[@href='" relative-href "']")))
+                                   (.click)
+                                   ;; Wait for page to load
+                                   (.then (fn [_]
+                                            (.wait poe.core/driver
+                                                   (fn []
+                                                     (-> (.getCurrentUrl poe/driver)
+                                                         (.then #(str/includes? % href))))
+                                                   5000)))
+                                   (.then (fn [_]
+                                            (.findElements poe/driver (poe/by* :xpath "//*[contains(@class, 'resource-row app')]"))))
+                                   (.then (fn [app-elements]
+                                            (reduce (fn [app-acc-promise app-element]
+                                                      (.then app-acc-promise
+                                                             (fn [app-acc]
+                                                               (-> app-element
+                                                                   (.getAttribute "href")
+                                                                   (.then (fn [href]
+                                                                            (-> (.findElement app-element (poe/by* :css ".resource-row__title"))
+                                                                                (.then #(.getText %))
+                                                                                (.then (fn [name]
+                                                                                         ;; href in the form https://dashboard.aptible.com/apps/123456, we just want the id
+                                                                                         (conj app-acc [name (last (str/split href #"/"))]))))))))))
+                                                    (js/Promise.resolve [])
+                                                    app-elements)))
+                                   (.then (fn [name-id-tuples]
+                                            (into {} name-id-tuples)))
+                                   (.then (fn [app-map]
+                                            (assoc-in result-acc [:environment-name->app-name->app-id env-name] app-map))))))))
+                  (js/Promise.resolve result)
+                  environment-name-href-tuples))))))
 
 (defn validate-edn-configuration
   "Makes sure that for every stack/env/app in security-scan-tuples, there are mappings"
