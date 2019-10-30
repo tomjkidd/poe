@@ -251,7 +251,11 @@
   webdriver via the aptible web ui."
   [& args]
   (let [url            "https://dashboard.aptible.com/login"
-        scan-all-apps? (some #(= "--scan-all-apps" %) args)]
+        scan-all-apps? (some #(= "--scan-all-apps" %) args)
+        skip           (or (some #(when (= "--skip" (first %))
+                                    (js/parseInt (second %)))
+                                 (partition 2 1 args))
+                           0)]
     (.then (poe/run
              {:url   url
               :quit? false}
@@ -291,7 +295,7 @@
                                                       aptible-identifiers
                                                       cur)))
                        [[:click landing-page-selector]]
-                       app-scan-tuples))))))
+                       (drop skip app-scan-tuples)))))))
 
 (comment
   (require 'poe.core
