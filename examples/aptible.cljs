@@ -64,12 +64,12 @@
 
 (defn produce-security-scan-actions
   [aptible-identifiers stack environment app]
-  (let [stack-selector            (str "a[href='/stack/" (get-in aptible-identifiers [:stack-name->id stack]) "']")
-        environment-selector      (str "a[href='/accounts/" (get-in aptible-identifiers [:environment-name->id environment] "']"))
-        app-selector              (str "a[href='/apps/" (get-in aptible-identifiers [:environment-name->app-name->app-id environment app]) "']")
-        security-scan-selector    (str "a[href='/apps/" (get-in aptible-identifiers [:environment-name->app-name->app-id environment app]) "/security-scan']")
-        table-selector            "//table"
-        table-or-success-selector "//table|//*[contains(@class,'alert-success')]"]
+  (let [stack-selector         (str "a[href='/stack/" (get-in aptible-identifiers [:stack-name->id stack]) "']")
+        environment-selector   (str "a[href='/accounts/" (get-in aptible-identifiers [:environment-name->id environment] "']"))
+        app-selector           (str "a[href='/apps/" (get-in aptible-identifiers [:environment-name->app-name->app-id environment app]) "']")
+        security-scan-selector (str "a[href='/apps/" (get-in aptible-identifiers [:environment-name->app-name->app-id environment app]) "/security-scan']")
+        table-selector         "//table"
+        scan-result-selector   "//table|//*[contains(@class,'alert-success')]|//*[contains(@class,'alert-danger')]"]
     [[:wait-until-located stack-selector]
      [:wait-until-visible stack-selector]
      [:click stack-selector]
@@ -87,13 +87,30 @@
      [:click security-scan-selector]
 
      ;; Provide some time for the scan to complete
-     [:wait-until-located table-or-success-selector {:timeout 60000
-                                                     :by      :xpath}]
-     [:wait-until-visible table-or-success-selector {:by :xpath}]
-     #(.executeScript poe/driver "return document.getElementsByClassName('alert-success').length > 0;")
-     (fn [no-vulnerabilities?]
-       (if no-vulnerabilities?
-         (js/Promise.resolve [])
+     [:wait-until-located scan-result-selector {:timeout 60000
+                                                :by      :xpath}]
+     [:wait-until-visible scan-result-selector {:by :xpath}]
+     #(.then (.executeScript poe/driver "return document.getElementsByClassName('alert-success').length > 0;")
+             (fn [success?]
+               (.then (.executeScript poe/driver "return document.getElementsByClassName('alert-danger').length > 0;")
+                      (fn [unsupported?]
+                        (cond
+                          success?     :no-vulnerabilities
+                          unsupported? :unsupported
+                          :else        :found-vulnerabilities)))))
+     (fn [status]
+       (case status
+         :no-vulnerabilities
+         (do
+           (println "No vulnerabilities found.")
+           (js/Promise.resolve []))
+
+         :unsupported
+         (do
+           (println (str "Unsupported app '" app "' in environment '" environment "'. See aptible for more details."))
+           (js/Promise.resolve []))
+
+         :found-vulnerabilities
          (html-scrape/scrape-table poe/driver {:selector        table-selector
                                                :by              :xpath
                                                :include-header? true})))
