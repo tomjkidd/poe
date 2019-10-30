@@ -102,7 +102,7 @@
        (case status
          :no-vulnerabilities
          (do
-           (println "No vulnerabilities found.")
+           (println (str "No vulnerabilities found for app '" app "' in environment '" environment "'."))
            (js/Promise.resolve []))
 
          :unsupported
