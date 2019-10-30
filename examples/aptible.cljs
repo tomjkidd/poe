@@ -3,7 +3,7 @@
 
   APTIBLE_EMAIL=fake@email.com APTIBLE_PASSWORD=p@ssW0rD APTIBLE_MULTI_FACTOR_TOKEN=123456 lumo --classpath src:examples -m examples.aptible
   "
-  (:require [cljs.pprint :refer [pprint]]
+  (:require [cljs.pprint :refer [pprint print-table]]
             [clojure.string :as str]
             [poe.core :as poe]
             [poe.file-export :as file-export]
@@ -21,13 +21,15 @@
 (def security-scan-tuples-path (or process.env.APTIBLE_SECURITY_SCAN_TUPLE_EDN_FILE
                                    (str cwd "/examples/aptible/security-scan-tuples.edn")))
 (def security-scan-tuples
-  "A vector of vectors, each of which specifies a [stack-name environment-name app-name].
+  "A vector of vectors, each of which specifies a [stack-name environment-name
+  app-name].
 
-  Each named entity must be present in the result produced by determine-aptible-identifiers!
+  Each named entity must be present in the result produced by
+  determine-aptible-identifiers!
 
-  These tuples are used by `examples.aptible/produce-security-scan-actions` to navigatate
-  to the \"Security Scan\" tab to run the scan and capture results."
-  (slurp-edn security-scan-tuples-path))
+  These tuples are used by `examples.aptible/produce-security-scan-actions` to
+  navigatate to the \"Security Scan\" tab to run the scan and capture results."
+  (delay (slurp-edn security-scan-tuples-path)))
 
 (def landing-page-selector
   "The selector to click to bring you back to the expected landing page"
@@ -84,7 +86,9 @@
      [:wait-until-visible security-scan-selector]
      [:click security-scan-selector]
 
-     [:wait-until-located table-or-success-selector {:by :xpath}]
+     ;; Provide some time for the scan to complete
+     [:wait-until-located table-or-success-selector {:timeout 60000
+                                                     :by      :xpath}]
      [:wait-until-visible table-or-success-selector {:by :xpath}]
      #(.executeScript poe/driver "return document.getElementsByClassName('alert-success').length > 0;")
      (fn [no-vulnerabilities?]
@@ -94,8 +98,8 @@
                                                :by              :xpath
                                                :include-header? true})))
      (fn [rows]
-       (let [filename  (str "aptible-security-scan-"
-                            stack "-" environment "-" app "-"
+       (let [filename  (str "aptible-security-scan."
+                            stack "." environment "." app "."
                             (.toISOString (js/Date.)) ".csv")
              directory (or env-output-dir cwd)
              file      (str directory "/" filename)]
@@ -105,14 +109,14 @@
      [:click landing-page-selector]]))
 
 (defn determine-aptible-identifiers
-  "Returns a promise that will eventually know all stack/env/app ids, and provide
-  lookups to get from names to the ids.
+  "Returns a promise that will eventually know all stack/env/app ids, and
+  provide lookups to get from names to the ids.
 
   Demonstrates how to scrape the aptible landing page to extract all of the ids
   to be able to use stack/env/app names instead of ids.
 
-  The aptible UI renders elements with hrefs to ids, not the convenient names
-  of stacks/environments/apps. For this reason, it is most simple to create a
+  The aptible UI renders elements with hrefs to ids, not the convenient names of
+  stacks/environments/apps. For this reason, it is most simple to create a
   mapping of names to ids so that the selectors used in navigation are more
   reliable."
   []
@@ -137,14 +141,20 @@
                              ;; accounts correspond to environments
                              (str/includes? href "/accounts/")
                              (-> acc
-                                 (update :environment-name-href-tuples conj [name href])
+                                 (update :stack-name-environment-name-href-tuples conj [(:current-stack acc) name href])
                                  (assoc-in [:environment-name->id name] (last (str/split href #"/"))))
 
+                             ;; Capture the stack, so that each following environment can be associated with it
                              (str/includes? href "/stack/")
-                             (assoc-in acc [:stack-name->id name] (last (str/split href #"/")))))
-                         {:stack-name->id                     {}
+                             (-> acc
+                                 (assoc :current-stack name)
+                                 (assoc-in [:stack-name->id name] (last (str/split href #"/"))))))
+                         {:current-stack                           nil
+                          :stack-name-environment-name-href-tuples []
+                          :app-scan-tuples                         []
+
+                          :stack-name->id                     {}
                           :environment-name->id               {}
-                          :environment-name-href-tuples       []
                           :environment-name->app-name->app-id {}}
                          ;; There is an item with a nil href for creating a new environment
                          (filter #(some? (second %))
@@ -153,11 +163,11 @@
                  (.then (.executeScript poe/driver "return window.location.hostname;")
                         (fn [hostname]
                           (assoc result :hostname hostname)))))
-        (.then (fn [{:keys [environment-name-href-tuples hostname] :as result}]
+        (.then (fn [{:keys [stack-name-environment-name-href-tuples hostname] :as result}]
                  ;; Navigate to each environment to scrape the apps that are there
                  ;; Note, reduce is used to make this happen sequentially, since js/Promise.all doesn't ensure that!
                  (reduce
-                  (fn [result-acc-promise [env-name href]]
+                  (fn [result-acc-promise [stack-name env-name href]]
                     (let [relative-href (second (str/split href hostname))]
                       (.then result-acc-promise
                              (fn [result-acc]
@@ -186,15 +196,21 @@
                                                                                          (conj app-acc [name (last (str/split href #"/"))]))))))))))
                                                     (js/Promise.resolve [])
                                                     app-elements)))
-                                   (.then (fn [name-id-tuples]
-                                            (into {} name-id-tuples)))
-                                   (.then (fn [app-map]
-                                            (assoc-in result-acc [:environment-name->app-name->app-id env-name] app-map))))))))
+                                   (.then (fn [app-name-id-tuples]
+                                            {:app-map   (into {} app-name-id-tuples)
+                                             :app-names (mapv first app-name-id-tuples)}))
+                                   (.then (fn [{:keys [app-map app-names]}]
+                                            (-> result-acc
+                                                (assoc-in [:environment-name->app-name->app-id env-name] app-map)
+                                                (update :app-scan-tuples #(into % (mapv (fn [app-name]
+                                                                                          [stack-name env-name app-name])
+                                                                                        app-names)))))))))))
                   (js/Promise.resolve result)
-                  environment-name-href-tuples))))))
+                  stack-name-environment-name-href-tuples))))))
 
 (defn validate-edn-configuration
-  "Makes sure that for every stack/env/app in security-scan-tuples, there are mappings"
+  "Makes sure that for every stack/env/app in security-scan-tuples, there are
+  mappings"
   [aptible-identifiers security-scan-tuples]
   (reduce (fn [acc [stack env app]]
             (cond-> acc
@@ -213,10 +229,12 @@
           security-scan-tuples))
 
 (defn -main
-  "Use web ui to identify aptible apps, run the \"Security Scan\" on the ones identified in config file,
-  and capture the results. All done through selenium webdriver via the aptible web ui."
-  [& _]
-  (let [url "https://dashboard.aptible.com/login"]
+  "Use web ui to identify aptible apps, run the \"Security Scan\" on the ones
+  identified in config file, and capture the results. All done through selenium
+  webdriver via the aptible web ui."
+  [& args]
+  (let [url            "https://dashboard.aptible.com/login"
+        scan-all-apps? (some #(= "--scan-all-apps" %) args)]
     (.then (poe/run
              {:url   url
               :quit? false}
@@ -224,10 +242,14 @@
                    [(fn [_]
                       (-> (determine-aptible-identifiers)
                           (.then (fn [aptible-identifiers]
-                                   (let [validation-result (validate-edn-configuration aptible-identifiers security-scan-tuples)]
+                                   (let [app-scan-tuples   (if scan-all-apps?
+                                                             (:app-scan-tuples aptible-identifiers)
+                                                             @security-scan-tuples)
+                                         validation-result (validate-edn-configuration aptible-identifiers app-scan-tuples)]
                                      {:aptible-identifiers aptible-identifiers
-                                      :validation-result   validation-result})))
-                          (.then (fn [{:keys [aptible-identifiers validation-result]}]
+                                      :validation-result   validation-result
+                                      :app-scan-tuples     app-scan-tuples})))
+                          (.then (fn [{:keys [validation-result] :as context}]
                                    (let [{:keys [errors]} validation-result]
                                      (if (seq errors)
                                        (do
@@ -237,8 +259,14 @@
                                          (-> (.close poe/driver)
                                              (.then #(.quit poe/driver))
                                              (.then #(.exit js/process 1))))
-                                       aptible-identifiers))))))]))
-           (fn [aptible-identifiers]
+                                       context))))))]))
+           (fn [{:keys [aptible-identifiers app-scan-tuples]}]
+             (println "Attempting to scan the following:")
+             (print-table
+              [:stack :environment :app]
+              (mapv (fn [[s e a]]
+                      {:stack s :environment e :app a})
+                    app-scan-tuples))
              (poe/run
                {:promise (js/Promise.resolve nil)
                 :quit?   true}
@@ -246,7 +274,7 @@
                                                       aptible-identifiers
                                                       cur)))
                        [[:click landing-page-selector]]
-                       security-scan-tuples))))))
+                       app-scan-tuples))))))
 
 (comment
   (require 'poe.core
