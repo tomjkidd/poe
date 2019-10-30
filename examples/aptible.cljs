@@ -70,15 +70,15 @@
         security-scan-selector (str "a[href='/apps/" (get-in aptible-identifiers [:environment-name->app-name->app-id environment app]) "/security-scan']")
         table-selector         "//table"
         scan-result-selector   "//table|//*[contains(@class,'alert-success')]|//*[contains(@class,'alert-danger')]"]
-    [[:wait-until-located stack-selector]
+    [[:wait-until-located stack-selector {:timeout 10000}]
      [:wait-until-visible stack-selector]
      [:click stack-selector]
 
-     [:wait-until-located environment-selector {:timeout 5000}]
+     [:wait-until-located environment-selector {:timeout 10000}]
      [:wait-until-visible environment-selector]
      [:click environment-selector]
 
-     [:wait-until-located app-selector {:timeout 5000}]
+     [:wait-until-located app-selector {:timeout 10000}]
      [:wait-until-visible app-selector]
      [:click app-selector]
 
