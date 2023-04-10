@@ -17,6 +17,6 @@
   "license": "MIT",
   "dependencies": {
     "csv-stringify": "5.3.3",
-    "selenium-webdriver": "^4.0.0-alpha.5"
+    "selenium-webdriver": "^4.8.2"
   }
 }
